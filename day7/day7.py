@@ -1,104 +1,88 @@
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(__file__, os.pardir, os.pardir)))
+
 import re
+from utils import AdventDay
 
 
-LINE_REGEX = re.compile(r'(.*) -> (.*)')
-NOT_REGEX = re.compile('NOT ([a-z]{1,2})')
-SHIFT_REGEX = re.compile('([a-z]{1,2}) [LR]SHIFT ([0-9]+)')
-OR_REGEX = re.compile('([a-z]{1,2}) OR ([a-z]{1,2})')
-AND_REGEX = re.compile('([a-z0-9]+) AND ([a-z]{1,2})')
-NUM_REGEX = re.compile('\d+')
-WIRE_REGEX = re.compile('[a-z]{1,2}')
+class Day7(AdventDay):
+    DAY = 7
 
+    LINE_REGEX = re.compile(r'(.*) -> (.*)')
+    NOT_REGEX = re.compile('NOT ([a-z]{1,2})')
+    SHIFT_REGEX = re.compile('([a-z]{1,2}) [LR]SHIFT ([0-9]+)')
+    OR_REGEX = re.compile('([a-z]{1,2}) OR ([a-z]{1,2})')
+    AND_REGEX = re.compile('([a-z0-9]+) AND ([a-z]{1,2})')
+    NUM_REGEX = re.compile('\d+')
+    WIRE_REGEX = re.compile('[a-z]{1,2}')
 
-def get_test_input():
-    with open(os.path.abspath(os.path.join(__file__, os.pardir, 'test_input.txt'))) as test_file:
-        return [line.strip() for line in test_file.readlines()]
+    def get_instructions(self):
+        self.instructions = {}
+        for line in self.get_input():
+            instr, dest = self.LINE_REGEX.match(line).groups()
+            self.instructions[dest] = instr
 
+    def get_value(self, key):
+        instr = self.instructions[key]
 
-def get_input():
-    with open(os.path.abspath(os.path.join(__file__, os.pardir, 'input.txt'))) as input_file:
-        return [line.strip() for line in input_file.readlines()]
+        # Short-circuit if we've already done this key
+        if isinstance(instr, int):
+            return instr
 
+        if 'NOT' in instr:
+            inner_key, = self.NOT_REGEX.match(instr).groups()
+            self.instructions[key] = 65535 ^ self.get_value(inner_key)
 
-def get_value(key, instructions):
-    instr = instructions[key]
+        elif 'LSHIFT' in instr:
+            inner_key, amnt = self.SHIFT_REGEX.match(instr).groups()
+            self.instructions[key] = self.get_value(inner_key) << int(amnt)
 
-    # Short-circuit if we've already done this key
-    if isinstance(instr, int):
-        return instr
+        elif 'RSHIFT' in instr:
+            inner_key, amnt = self.SHIFT_REGEX.match(instr).groups()
+            self.instructions[key] = self.get_value(inner_key) >> int(amnt)
 
-    if 'NOT' in instr:
-        inner_key, = NOT_REGEX.match(instr).groups()
-        instructions[key] = 65535 ^ get_value(inner_key, instructions)
+        elif 'OR' in instr:
+            inner_key1, inner_key2 = self.OR_REGEX.match(instr).groups()
+            self.instructions[key] = self.get_value(inner_key1) | self.get_value(inner_key2)
 
-    elif 'LSHIFT' in instr:
-        inner_key, amnt = SHIFT_REGEX.match(instr).groups()
-        instructions[key] = get_value(inner_key, instructions) << int(amnt)
+        elif 'AND' in instr:
+            inner_key1, inner_key2 = self.AND_REGEX.match(instr).groups()
+            if self.NUM_REGEX.match(inner_key1):
+                self.instructions[key] = int(inner_key1) & self.get_value(inner_key2)
+            else:
+                self.instructions[key] = self.get_value(inner_key1) & self.get_value(inner_key2)
 
-    elif 'RSHIFT' in instr:
-        inner_key, amnt = SHIFT_REGEX.match(instr).groups()
-        instructions[key] = get_value(inner_key, instructions) >> int(amnt)
+        elif self.NUM_REGEX.match(instr):
+            self.instructions[key] = int(instr)
 
-    elif 'OR' in instr:
-        inner_key1, inner_key2 = OR_REGEX.match(instr).groups()
-        instructions[key] = get_value(inner_key1, instructions) | get_value(inner_key2, instructions)
+        elif self.WIRE_REGEX.match(instr):
+            self.instructions[key] = self.get_value(instr)
 
-    elif 'AND' in instr:
-        inner_key1, inner_key2 = AND_REGEX.match(instr).groups()
-        if NUM_REGEX.match(inner_key1):
-            instructions[key] = int(inner_key1) & get_value(inner_key2, instructions)
         else:
-            instructions[key] = get_value(inner_key1, instructions) & get_value(inner_key2, instructions)
+            raise Exception('No matches found!')
 
-    elif NUM_REGEX.match(instr):
-        instructions[key] = int(instr)
+        return self.instructions[key]
 
-    elif WIRE_REGEX.match(instr):
-        instructions[key] = get_value(instr, instructions)
+    def test(self):
+        self.instructions = {}
+        for line in self.get_test_input():
+            instr, dest = self.LINE_REGEX.match(line).groups()
+            self.instructions[dest] = instr
 
-    else:
-        raise Exception('No matches found!')
+        return '\n'.join('{}: {}'.format(l, self.get_value(l)) for l in 'defghixy')
 
-    return instructions[key]
+    def part1(self):
+        self.get_instructions()
+        self.part1_value = self.get_value('a')
+        return self.part1_value
 
-
-def test():
-    instructions = {}
-    for line in get_test_input():
-        instr, dest = LINE_REGEX.match(line).groups()
-        instructions[dest] = instr
-
-    print 'd:', get_value('d', instructions)
-    print 'e:', get_value('e', instructions)
-    print 'f:', get_value('f', instructions)
-    print 'g:', get_value('g', instructions)
-    print 'h:', get_value('h', instructions)
-    print 'i:', get_value('i', instructions)
-
-def part1():
-    instructions = {}
-    for line in get_input():
-        instr, dest = LINE_REGEX.match(line).groups()
-        instructions[dest] = instr
-
-    avalue = get_value('a', instructions)
-    print 'a:', avalue
-    return avalue
-
-
-def part2(avalue):
-    instructions = {}
-    for line in get_input():
-        instr, dest = LINE_REGEX.match(line).groups()
-        instructions[dest] = instr
-
-    # Override 'b' with value from part 1
-    instructions['b'] = avalue
-
-    print 'a:', get_value('a', instructions)
+    def part2(self):
+        self.get_instructions()
+        # Override 'b' with value from part 1
+        self.instructions['b'] = self.part1_value
+        return self.get_value('a')
 
 
 if __name__ == '__main__':
-    avalue = part1()
-    part2(avalue)
+    Day7().run()
