@@ -24,7 +24,7 @@ class AdventDay(object):
         pass
 
     def _get_input(self, filename):
-        dir_name = 'day{}'.format(self.DAY)
+        dir_name = 'day{:0>2}'.format(self.DAY)
         inp_path = os.path.abspath(os.path.join(__file__, os.pardir, dir_name, filename))
         with open(inp_path) as inp_file:
             return [line.strip() for line in inp_file.readlines()]
